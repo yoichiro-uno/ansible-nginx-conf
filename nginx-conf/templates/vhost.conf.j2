@@ -1,0 +1,37 @@
+server {
+    listen       "{{item.vhost_server_port}}";
+    server_name  "{{item.vhost_server_name}}";
+    charset "{{item.vhost_charset}}";
+    access_log  {{item.vhost_log_dir}}/{{item.vhost_access_log}};
+    error_log  {{item.vhost_log_dir}}/{{item.vhost_error_log}};
+    location / {
+                set $is_sphone 0;
+                if ($http_user_agent ~ Android) {
+                        set $is_sphone 1;
+                }
+                if ($http_user_agent ~ iPhone) {
+                        set $is_sphone 1;
+                }
+                if ($http_user_agent ~ iPod) {
+                        set $is_sphone 1;
+                }
+                if ($http_user_agent ~ iPad) {
+                        set $is_sphone 1;
+                }
+                if ($is_sphone = 1) {
+                        root   "{{item.vhost_sp_DocumentRoot}}";
+                }
+                if ($is_sphone != 1) {
+                        root   "{{item.vhost_DocumentRoot}}";
+	        }
+        index  index.html index.htm;
+    }
+    error_page  404               /{{item.vhost_404error_page_name}};
+    location = /{{item.vhost_404error_page_name}} {
+        root   "{{item.vhost_404error_page_path}}";
+    }
+    error_page  500 502 503 504 /{{item.vhost_50xerror_page_name}};
+    location = /{{item.vhost_50xerror_page_name}} {
+        root   "{{item.vhost_50xerror_page_path}}";
+    }
+}

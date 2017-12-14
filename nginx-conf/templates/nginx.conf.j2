@@ -1,0 +1,10 @@
+user  "{{nginx_default_user}}";
+worker_processes  "{{nginx_default_worker_processes}}";
+
+error_log  "{{nginx_default_log_dir}}/{{nginx_default_error_log}}" "{{nginx_default_errorlog_level}}";
+pid        "{{nginx_default_pid}}";
+
+
+events {
+    worker_connections  "{{nginx_default_worker_connections}}";
+}

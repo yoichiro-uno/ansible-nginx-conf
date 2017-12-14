@@ -1,0 +1,7 @@
+upstream {{item.tcpudp_proxy_pass}} {
+
+}
+server {
+  listen "{{item.tcpudp_listen_port}}";
+  proxy_pass "{{item.tcpudp_proxy_pass}}";
+}

@@ -1,0 +1,7 @@
+- name: disable repo
+  replace: dest=/etc/yum.repos.d/{{item}} regexp="enabled *= *1" replace="enabled=0"
+  with_items:
+    - nginx.repo
+
+- name: restart nginx
+  service: name=nginx state=restarted

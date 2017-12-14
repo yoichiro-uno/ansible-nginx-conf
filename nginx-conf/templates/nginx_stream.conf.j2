@@ -1,0 +1,6 @@
+stream {
+    error_log /var/log/nginx/stream.log info;
+    proxy_protocol on;
+
+    include /etc/nginx/conf.d/tcpudp/*.conf;
+}

@@ -1,0 +1,47 @@
+- name: is nginx already installed
+  shell: which nginx | echo $?
+  register: nginxexists
+  failed_when: nginxexists.rc not in [0, 1]
+
+- name: Install Repository for Nginx (CentOS7)
+  yum: name={{item}}
+  when:
+    - nginxexists.rc==0
+    - ansible_distribution_major_version=='7'
+  with_items:
+    - http://nginx.org/packages/centos/7/noarch/RPMS/nginx-release-centos-7-0.el7.ngx.noarch.rpm
+
+- name: Install Repository for Nginx (CentOS6)
+  yum: name={{item}}
+  when: 
+    - nginxexists.rc==0
+    - ansible_distribution_major_version=='6'
+  with_items:
+    - http://nginx.org/packages/centos/6/noarch/RPMS/nginx-release-centos-6-0.el6.ngx.noarch.rpm
+
+- name: enable repo if not
+  replace: dest=/etc/yum.repos.d/{{item}} regexp="enabled *= *0" replace="enabled=1"
+  when: nginxexists.rc=='0'
+  with_items:
+    - nginx.repo
+
+- name: Install nginx
+  yum: name=nginx
+       state=present
+  notify: disable repo
+
+- name: Start nginx service
+  service: name=nginx
+           state=started
+           enabled=yes
+
+- name: Hide nginx version info
+  lineinfile:
+    dest=/etc/nginx/nginx.conf
+    backup=yes
+    insertafter='^http {'
+    line={{item}}
+  with_items:
+    - 'server_tokens off;'
+  notify:
+    - restart nginx

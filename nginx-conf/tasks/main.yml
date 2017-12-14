@@ -1,0 +1,192 @@
+- name: is nginx already installed
+  shell: which nginx | echo $?
+  register: nginxexists
+  failed_when: nginxexists.rc not in [0, 1]
+  changed_when: False
+
+- block:
+  - name: Include http section
+    lineinfile:
+      path: "/etc/nginx/nginx.conf"
+      line: "include /etc/nginx/nginx_http.conf;"
+#    when: 
+#      - nginx_conf.changed
+#      - nginx_default_useproxy=='1'
+#      - nginx_default_useweb=='1'
+    register: include_http
+    notify:
+      - restart nginx
+
+  - name: Create nginx_http.conf
+    template: 
+      src: nginx_http.conf.j2
+      dest: "/etc/nginx/nginx_http.conf"
+      owner: "root"
+      group: "root"
+      mode: "0644"
+  #    force: no
+    register: include_http.rc=='0'
+    notify:
+      - restart nginx
+
+  when: 
+    - nginx_default_useweb=='1'
+
+- block:
+  - name: Include stream section
+    lineinfile:
+      path: "/etc/nginx/nginx.conf"
+      line: "include /etc/nginx/nginx_stream.conf;"
+#    when: 
+#      - nginx_conf.changed
+#      - nginx_default_usestream=='1'
+    register: include_stream
+  
+  - name: Create nginx_stream.conf
+    template: 
+      src: nginx_stream.conf.j2
+      dest: "/etc/nginx/nginx_stream.conf"
+      owner: "root"
+      group: "root"
+      mode: "0644"
+      #force: no
+    register: include_stream.rc=='0'
+
+  - name: Create Directory for Stream config
+    file:
+      path: "/etc/nginx/conf.d/tcpudp"
+      state: directory
+      owner: "{{nginx_default_user}}"
+      group: "{{nginx_default_group}}"
+      mode: 0744
+    register: include_stream.rc=='0'
+
+  when:
+    - nginx_default_usestream=='1'
+
+- block:
+  - name: Create nginx Proxy list
+    template: 
+      src: proxylist.conf.j2
+      dest: "/etc/nginx/conf.d/proxylist_{{item.proxy_name}}.conf"
+      owner: "root"
+      group: "root"
+      mode: "0644"
+      force: no
+    with_items: "{{nginx_proxy_hosts}}"
+    notify:
+      - restart nginx
+#    when: nginx_default_useproxy=='1'
+  
+  - name: List Up Proxy Backends
+    lineinfile:
+      path: "/etc/nginx/conf.d/proxylist_{{item.0.proxy_name}}.conf"
+      insertbefore: '^}$'
+      line: "server {{item.1}};"
+    with_subelements:
+      - "{{nginx_proxy_hosts}}"
+      - serverlist
+      - flags:
+          skip_missing: True
+    notify:
+      - restart nginx
+#    when: nginx_default_useproxy=='1'
+
+  - name: Create nginx Proxy
+    template: 
+      src: proxy_master.conf.j2
+      dest: "/etc/nginx/conf.d/proxy_{{item.server_name}}.conf"
+      owner: "root"
+      group: "root"
+      mode: "0644"
+    with_items: "{{nginx_proxy_master}}"
+    notify:
+      - restart nginx
+
+  when: 
+    - nginx_default_useproxy=='1'
+
+- block:
+  - name: Create nginx vHosts
+    template: 
+      src: vhost.conf.j2
+      dest: "/etc/nginx/conf.d/vhost_{{item.vhost_server_name}}.conf"
+      owner: "root"
+      group: "root"
+      mode: "0644"
+    with_items: "{{nginx_vhosts}}"
+    notify:
+      - restart nginx
+  
+  - name: Create vhost Documentroot
+    file:
+      path: "{{item.vhost_DocumentRoot}}"
+      state: directory
+      owner: "{{nginx_default_user}}"
+      group: "{{nginx_default_group}}"
+      mode: 0744
+    with_items: "{{nginx_vhosts}}"
+  
+  - name: Create vhost SmartPhone Documentroot
+    file:
+      path: "{{item.vhost_sp_DocumentRoot}}"
+      state: directory
+      owner: "{{nginx_default_user}}"
+      group: "{{nginx_default_group}}"
+      mode: 0744
+    with_items: "{{nginx_vhosts}}"
+
+  - name: delete default config
+    file: 
+      path: "/etc/nginx/conf.d/default.conf"
+      state: absent
+
+  when: 
+    - nginx_default_useweb=='1'
+ 
+
+- block:
+  - name: Create nginx TCPUDP Upstream list
+    template: 
+      src: tcpudp_proxy_master.conf.j2
+      dest: "/etc/nginx/conf.d/tcpudp/tcpudp_proxy_{{item.tcpudp_proxy_pass}}.conf"
+      owner: "root"
+      group: "root"
+      mode: "0644"
+      force: no
+    with_items: "{{nginx_tcpudp_hosts}}"
+    notify:
+      - restart nginx
+#    when: nginx_default_useproxy=='1'
+  
+  - name: Listup TcpUdp Backend
+    lineinfile:
+      path: "/etc/nginx/conf.d/tcpudp/tcpudp_proxy_{{item.0.tcpudp_proxy_pass}}.conf"
+      insertafter: "^upstream "
+      line: "server {{item.1}};"
+    with_subelements:
+      - "{{nginx_tcpudp_hosts}}"
+      - tcpudp_serverlist
+      - flags:
+          skip_missing: True
+    notify:
+      - restart nginx
+#    when: nginx_default_useproxy=='1'
+  when: 
+    - nginx_default_usestream=='1'
+
+
+- name: ReStart nginx service
+  service: name=nginx
+           state=restarted
+
+#- name: Hide nginx version info
+#  lineinfile:
+#    dest=/etc/nginx/nginx.conf
+#    backup=yes
+#    insertafter='^http {'
+#    line={{item}}
+#  with_items:
+#    - 'server_tokens off;'
+#  notify:
+#    - restart nginx
